@@ -1,0 +1,35 @@
+{
+  "name": "csbp",
+  "version": "1.0.0",
+  "description": "Clock SoulBind Point (CSBP) implementation based on Verifiable Logical Clock",
+  "main": "dist/index.js",
+  "scripts": {
+    "test": "jest",
+    "build": "babel src -d dist",
+    "example": "node examples/nostr-usage.js",
+    "basic": "node examples/basic-usage.js"
+  },
+  "dependencies": {
+    "@noble/secp256k1": "^1.7.1",
+    "nostr-tools": "^1.17.0",
+    "verifiable-logical-clock": "^1.0.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.x",
+    "@babel/core": "^7.x",
+    "@babel/preset-env": "^7.x",
+    "babel-jest": "^29.x",
+    "jest": "^29.x",
+    "jest-environment-jsdom": "^29.x"
+  },
+  "jest": {
+    "transform": {
+      "^.+\\.jsx?$": "babel-jest"
+    },
+    "transformIgnorePatterns": [
+      "node_modules/(?!(verifiable-logical-clock)/)"
+    ],
+    "testEnvironment": "jsdom"
+  }
+}
