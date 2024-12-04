@@ -14,7 +14,7 @@ A decentralized invitation system based on Verifiable Logical Clock and Nostr pr
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/Clock-SoulBind-Points.git
+git clone https://github.com/peter-jim/Clock-SoulBind-Points
 
 # Install dependencies
 cd Clock-SoulBind-Points

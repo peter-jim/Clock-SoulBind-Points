@@ -16,8 +16,15 @@ const RESPONSE_STATUS = {
   PENDING: 'PENDING'
 };
 
+const CONTEXT_TYPES = {
+  USER: 'user',
+  PROJECT: 'project',
+  EVENT: 'event'
+};
+
 module.exports = {
   NOSTR_KINDS,
   EVENT_TYPES,
-  RESPONSE_STATUS
+  RESPONSE_STATUS,
+  CONTEXT_TYPES
 }; 

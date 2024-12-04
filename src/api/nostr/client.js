@@ -1,94 +1,183 @@
-const { SimplePool } = require('nostr-tools');
 const WebSocket = require('ws');
-
-// Provide global WebSocket implementation for nostr-tools
-if (typeof global.WebSocket === 'undefined') {
-  global.WebSocket = WebSocket;
-}
 
 class NostrClient {
   constructor(relayUrl) {
     this.relayUrl = relayUrl;
-    this.pool = new SimplePool();
-    this.subscriptions = new Map();
+    this.ws = null;
     this.connected = false;
+    this.messageHandlers = new Map();
+    this.subscriptions = new Map();
   }
 
   async connect() {
     if (this.connected) return;
     
-    try {
-      // Test connection by fetching a single event
-      await this.pool.get(
-        [this.relayUrl],
-        { kinds: [1], limit: 1 }
-      );
-      this.connected = true;
-    } catch (error) {
-      console.error('Failed to connect:', error);
-      throw error;
-    }
+    return new Promise((resolve, reject) => {
+      try {
+        console.log('Connecting to relay:', this.relayUrl);
+        this.ws = new WebSocket(this.relayUrl);
+        
+        this.ws.onopen = () => {
+          console.log('WebSocket connected to', this.relayUrl);
+          this.connected = true;
+          this.setupMessageHandler();
+          resolve();
+        };
+
+        this.ws.onerror = (error) => {
+          console.error('WebSocket error:', error);
+          reject(error);
+        };
+
+        this.ws.onclose = () => {
+          console.log('WebSocket closed');
+          this.connected = false;
+          this.ws = null;
+          this.messageHandlers.clear();
+        };
+
+      } catch (error) {
+        console.error('Failed to connect:', error);
+        reject(error);
+      }
+    });
+  }
+
+  setupMessageHandler() {
+    this.ws.onmessage = (msg) => {
+      try {
+        const data = JSON.parse(msg.data);
+        console.log('Received message:', data);
+        
+        if (data[0] === 'NOTICE') {
+          console.error('Relay notice:', data[1]);
+          if (data[1].toLowerCase().includes('invalid')) {
+            for (const [eventId, handler] of this.messageHandlers) {
+              handler(false, data[1]);
+              this.messageHandlers.delete(eventId);
+            }
+          }
+        } else if (data[0] === 'OK') {
+          const [, eventId, success, message] = data;
+          const handler = this.messageHandlers.get(eventId);
+          if (handler) {
+            handler(success, message);
+            this.messageHandlers.delete(eventId);
+          }
+        } else if (data[0] === 'EVENT') {
+          const [, subId, event] = data;
+          const subscription = this.subscriptions.get(subId);
+          if (subscription?.callback) {
+            subscription.callback(event);
+          }
+        } else if (data[0] === 'EOSE') {
+          const [, subId] = data;
+          const subscription = this.subscriptions.get(subId);
+          if (subscription?.onEose) {
+            subscription.onEose();
+          }
+        }
+      } catch (error) {
+        console.error('Error handling message:', error);
+      }
+    };
   }
 
   async publish(event) {
-    if (!this.connected) {
+    if (!this.connected || !this.ws) {
       await this.connect();
     }
 
-    try {
-      console.log('Publishing event:', event.toJSON());
-      const pubs = this.pool.publish([this.relayUrl], event.toJSON());
-      await Promise.all(pubs);
-      console.log('Event published successfully');
-    } catch (error) {
-      console.error('Failed to publish event:', error);
-      throw error;
-    }
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.messageHandlers.delete(event.id);
+        reject(new Error('Publish timeout: no response from relay'));
+      }, 15000);
+
+      this.messageHandlers.set(event.id, (success, message) => {
+        clearTimeout(timeout);
+        if (success) {
+          console.log('Event published successfully');
+          resolve(event);
+        } else {
+          reject(new Error(`Relay rejected event: ${message}`));
+        }
+      });
+
+      try {
+        const eventData = ['EVENT', event];
+        console.log('Sending event to relay:', JSON.stringify(eventData, null, 2));
+        this.ws.send(JSON.stringify(eventData));
+      } catch (error) {
+        clearTimeout(timeout);
+        this.messageHandlers.delete(event.id);
+        reject(error);
+      }
+    });
+  }
+
+  async reconnect() {
+    console.log('Attempting to reconnect...');
+    this.close();
+    await this.connect();
   }
 
   subscribe(filters, callback, onEose) {
-    if (!this.connected) {
-      throw new Error('Not connected to relay');
+    if (!this.connected || !this.ws) {
+      throw new Error('WebSocket not connected');
     }
 
+    // Generate subscription ID
     const subId = Math.random().toString(36).substring(2);
-    const sub = this.pool.sub([this.relayUrl], filters);
+    
+    // Store subscription
+    this.subscriptions.set(subId, {
+      filters,
+      callback,
+      onEose
+    });
 
-    if (sub.on) {
-      // Handle incoming events
-      sub.on('event', (event) => {
-        console.log('Received event:', event);
-        callback(event);
-      });
-
-      // Handle end of stored events
-      sub.on('eose', () => {
-        console.log('End of stored events');
-        if (onEose) onEose();
-      });
+    // Send subscription request
+    try {
+      const subRequest = ['REQ', subId, ...filters];
+      console.log('Sending subscription request:', subRequest);
+      this.ws.send(JSON.stringify(subRequest));
+    } catch (error) {
+      console.error('Error sending subscription:', error);
+      this.subscriptions.delete(subId);
+      throw error;
     }
 
-    this.subscriptions.set(subId, sub);
     return subId;
   }
 
-  unsubscribe(subscriptionId) {
-    const sub = this.subscriptions.get(subscriptionId);
-    if (sub?.unsub) {
-      sub.unsub();
-      this.subscriptions.delete(subscriptionId);
+  unsubscribe(subId) {
+    if (!this.connected || !this.ws) {
+      return;
+    }
+
+    try {
+      this.ws.send(JSON.stringify(['CLOSE', subId]));
+      this.subscriptions.delete(subId);
+      console.log('Unsubscribed from:', subId);
+    } catch (error) {
+      console.error('Error unsubscribing:', error);
     }
   }
 
   close() {
-    for (const [id, sub] of this.subscriptions.entries()) {
-      if (sub?.unsub) {
-        sub.unsub();
-        this.subscriptions.delete(id);
-      }
+    // Unsubscribe from all subscriptions
+    for (const subId of this.subscriptions.keys()) {
+      this.unsubscribe(subId);
     }
-    this.pool.close([this.relayUrl]);
+    this.subscriptions.clear();
+
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
     this.connected = false;
+    this.messageHandlers.clear();
   }
 }
 

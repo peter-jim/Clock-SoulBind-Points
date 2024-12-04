@@ -1,5 +1,6 @@
 const { BaseEvent } = require('../core/event');
-const { EVENT_TYPES, RESPONSE_STATUS } = require('../api/constants');
+const { EVENT_TYPES } = require('../api/constants');
+const { NostrInviteEvent } = require('../api/nostr/events');
 
 class InviteEvent extends BaseEvent {
   constructor(id, inviter, invitee, metadata = {}) {
@@ -7,7 +8,6 @@ class InviteEvent extends BaseEvent {
     this.data = {
       inviter,
       invitee,
-      status: RESPONSE_STATUS.PENDING,
       metadata: {
         projectId: metadata.ProjectId,
         message: metadata.message,
@@ -16,16 +16,24 @@ class InviteEvent extends BaseEvent {
     };
   }
 
-  accept() {
-    this.data.status = RESPONSE_STATUS.ACCEPTED;
-    this.data.responseTime = Date.now();
-    console.log(`Invite ${this.id} accepted`);
+  getProjectId() {
+    return this.data.metadata.projectId || this.data.metadata.ProjectId;
   }
 
-  reject() {
-    this.data.status = RESPONSE_STATUS.REJECTED;
-    this.data.responseTime = Date.now();
-    console.log(`Invite ${this.id} rejected`);
+  async toNostrEvent() {
+    return await NostrInviteEvent.create({
+      inviter: this.data.inviter,
+      invitee: this.data.invitee,
+      projectId: this.getProjectId(),
+      metadata: {
+        message: this.data.metadata.message,
+        timestamp: Date.now(),
+        platform: 'CSBP',
+        version: '1.0.0',
+        ...this.data.metadata
+      },
+      privateKey: this.data.metadata.privateKey
+    });
   }
 }
 

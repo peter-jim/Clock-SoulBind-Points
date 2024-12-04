@@ -1,30 +1,47 @@
 const { InviteEvent } = require('../../src/events/invite');
-const { RESPONSE_STATUS } = require('../../src/api/constants');
+const { generatePrivateKey } = require('../../src/api/nostr/events');
 
 describe('InviteEvent', () => {
-  test('should create invite event with correct structure', () => {
-    const invite = new InviteEvent('test1', 'alice', 'bob', {
+  test('should create invite event with correct data', () => {
+    const invite = new InviteEvent('inv1', 'alice', 'bob', {
       ProjectId: 'project123',
       message: 'Join us!'
     });
 
-    expect(invite.id).toBe('test1');
-    expect(invite.type).toBe('INVITE');
+    expect(invite.id).toBe('inv1');
     expect(invite.data.inviter).toBe('alice');
     expect(invite.data.invitee).toBe('bob');
-    expect(invite.data.metadata.ProjectId).toBe('project123');
+    expect(invite.data.metadata.projectId).toBe('project123');
     expect(invite.data.metadata.message).toBe('Join us!');
   });
 
-  test('should handle accept/reject', () => {
-    const invite = new InviteEvent('inv1', 'alice', 'bob');
-    
-    invite.accept();
-    expect(invite.data.status).toBe(RESPONSE_STATUS.ACCEPTED);
-    expect(invite.data.responseTime).toBeDefined();
+  test('should get project ID correctly', () => {
+    const invite1 = new InviteEvent('inv1', 'alice', 'bob', {
+      ProjectId: 'project123'
+    });
+    expect(invite1.getProjectId()).toBe('project123');
 
-    invite.reject();
-    expect(invite.data.status).toBe(RESPONSE_STATUS.REJECTED);
-    expect(invite.data.responseTime).toBeDefined();
+    const invite2 = new InviteEvent('inv2', 'alice', 'bob', {
+      projectId: 'project456'
+    });
+    expect(invite2.getProjectId()).toBe('project456');
+  });
+
+  test('should convert to Nostr event', async () => {
+    const privateKey = generatePrivateKey();
+    const invite = new InviteEvent('inv1', 'alice', 'bob', {
+      ProjectId: 'project123',
+      message: 'Join us!',
+      privateKey
+    });
+
+    const nostrEvent = await invite.toNostrEvent();
+    expect(nostrEvent).toBeDefined();
+    expect(nostrEvent.kind).toBe(1111); // NOSTR_KINDS.INVITE
+    
+    const content = JSON.parse(nostrEvent.content);
+    expect(content.inviter).toBe('alice');
+    expect(content.invitee).toBe('bob');
+    expect(content.projectId).toBe('project123');
   });
 }); 

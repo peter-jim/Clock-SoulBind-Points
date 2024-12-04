@@ -1,10 +1,13 @@
 const { CSBPClock, initializeClock } = require('../src/core/clock.js');
 const { NostrClient } = require('../src/api/nostr/client.js');
 const { InviteEvent } = require('../src/events/invite.js');
-const { generatePrivateKey, getPublicKey } = require('../src/api/nostr/events.js');
+const { getPublicKey } = require('../src/api/nostr/events.js');
 const { StorageManager } = require('../src/storage');
 const { NOSTR_KINDS, EVENT_TYPES } = require('../src/api/constants');
 const { validateContext } = require('../src/utils');
+
+// 固定的私钥
+const FIXED_PRIVATE_KEY = 'e8a904263dc87a7f52625dfa4f1e643d3531be5d5ded862eb1bc0ff6d1f2cd8f';
 
 async function main() {
   const client = new NostrClient('wss://relay1.nostrchat.io');
@@ -21,10 +24,12 @@ async function main() {
     await initializeClock();
     const clock = new CSBPClock(storage);
     
-    // Generate private key and get public key
-    const privateKey = generatePrivateKey();
-    const pubkey = await getPublicKey(privateKey);
-    console.log('Generated keypair:', { privateKey, pubkey });
+    // 使用固定私钥获取公钥
+    const pubkey = await getPublicKey(FIXED_PRIVATE_KEY);
+    console.log('Using fixed keypair:', {
+      privateKey: FIXED_PRIVATE_KEY,
+      pubkey
+    });
 
     // Define context
     const context = {
@@ -53,11 +58,11 @@ async function main() {
       throw error;
     }
 
-    // Create invite event
+    // Create invite event with fixed private key
     const invite = new InviteEvent('inv1', 'alice', 'bob', {
       ProjectId: context.projectId,
       message: 'Join our group!',
-      privateKey: privateKey
+      privateKey: FIXED_PRIVATE_KEY
     });
     
     // Print state before publishing
@@ -149,4 +154,9 @@ async function main() {
   }
 }
 
-main().catch(console.error); 
+// 如果直接运行此文件
+if (require.main === module) {
+  main().catch(console.error);
+}
+
+module.exports = { main, FIXED_PRIVATE_KEY }; 
