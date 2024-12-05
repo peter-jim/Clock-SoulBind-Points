@@ -6,9 +6,9 @@ A decentralized invitation system based on Verifiable Logical Clock and Nostr pr
 
 - Verifiable Logical Clock implementation
 - Nostr protocol integration
-- Invite event management
-- Decentralized event verification
-- Multiple relay support
+- Local event storage and synchronization
+- Multi-project and event type support
+- Reliable clock synchronization
 
 ## Installation
 
@@ -26,120 +26,135 @@ npm install
 ### Basic Usage
 
 ```javascript
-const { CSBPClock, InviteEvent } = require('csbp');
+const { CSBPClock, initializeClock } = require('./src/core/clock');
+const { StorageManager } = require('./src/storage');
+const { NostrClient } = require('./src/api/nostr/client');
+const { InviteEvent } = require('./src/events/invite');
 
-// Initialize clock
+// Initialize
 await initializeClock();
-const clock = new CSBPClock();
+const storage = new StorageManager();
+const clock = new CSBPClock(storage);
+const client = new NostrClient('wss://relay.nostr.com');
 
 // Create an invite event
-const invite = new InviteEvent('eventId', 'alice', 'bob', {
+const invite = new InviteEvent('event1', 'alice', 'bob', {
   ProjectId: 'project123',
-  message: 'Join our project!'
+  message: 'Join our project!',
+  privateKey: 'your_private_key'
 });
 
-// Add event to clock
-clock.addEvent(invite);
+// Publish event and update clock
+const clockValue = await clock.addEventAfterNostrPublish(
+  invite,
+  client,
+  'pubkey123',
+  'project123',
+  'INVITE'
+);
 
-// Handle invite response
-invite.accept(); // or invite.reject()
+// Query events
+const events = await clock.getAllEvents('pubkey123', 'project123', 'INVITE');
 ```
 
-### Nostr Integration
+### Event Types
 
-```javascript
-const { NostrClient, NostrInviteEvent } = require('csbp');
-
-// Create Nostr client
-const client = new NostrClient('wss://relay1.nostrchat.io');
-
-// Connect to relay
-await client.connect();
-
-// Create and publish invite
-const invite = await NostrInviteEvent.create({
-  inviter: 'alice',
-  invitee: 'bob',
-  projectId: 'project123',
-  metadata: {
-    message: 'Join us!',
-    platform: 'CSBP'
-  }
-});
-
-// Publish to relay
-await client.publish(invite);
-
-// Subscribe to responses
-client.subscribe([
-  {
-    kinds: [1111], // INVITE kind
-    authors: [invite.pubkey]
-  }
-], (event) => {
-  console.log('Received:', event);
-});
-```
-
-### Command Line Tools
-
-```bash
-# Fetch historical invites
-npm run fetch-history
-
-# Fetch specific event
-npm run fetch-event <eventId>
-```
+Currently supported event types:
+- INVITE: Invitation events
 
 ## API Reference
 
 ### CSBPClock
 
-Core clock implementation for event ordering.
+Main clock synchronization class.
 
-- `addEvent(event)`: Add new event
-- `getEvent(id)`: Get event by ID
-- `getAllEvents()`: Get all events
+```javascript
+class CSBPClock {
+  constructor(storage)
+  async addEventAfterNostrPublish(event, nostrClient, pubkey, projectId, eventType)
+  async getEvent(eventId, pubkey, projectId, eventType)
+  async getAllEvents(pubkey, projectId, eventType)
+  getClockValue(pubkey, projectId, eventType)
+  getClockState(pubkey, projectId, eventType)
+}
+```
+
+### StorageManager
+
+Local storage manager.
+
+```javascript
+class StorageManager {
+  async storeEvent(event, clockValue, pubkey, projectId, eventType)
+  async getEvent(eventId, pubkey, projectId, eventType)
+  async getAllEvents(pubkey, projectId, eventType)
+  async getLatestClockValue(pubkey, projectId, eventType)
+}
+```
+
+### InviteEvent
+
+Invitation event class.
+
+```javascript
+class InviteEvent {
+  constructor(id, inviter, invitee, metadata = {})
+  getProjectId()
+  async toNostrEvent()
+}
+```
 
 ### NostrClient
 
 Nostr protocol client implementation.
 
-- `connect()`: Connect to relay
-- `publish(event)`: Publish event
-- `subscribe(filters, callback)`: Subscribe to events
-- `close()`: Close connection
-
-### Events
-
-#### InviteEvent
-
-Base invite event implementation.
-
-- `accept()`: Accept invitation
-- `reject()`: Reject invitation
-- `getStatus()`: Get current status
-
-#### NostrInviteEvent
-
-Nostr-specific invite event implementation.
-
-- `create(options)`: Create new event
-- `fromNostrEvent(event)`: Convert from Nostr event
-- `getInviteData()`: Get invite metadata
+```javascript
+class NostrClient {
+  constructor(relayUrl)
+  async connect()
+  async publish(event)
+  subscribe(filters, onEvent, onEose)
+  close()
+}
+```
 
 ## Development
 
 ```bash
+# Install dependencies
+npm install
+
 # Run tests
 npm test
 
 # Run specific test
-npm test test/nostr/client.test.js
+npm test test/clock.test.js
 
-# Run examples
+# Run example
 npm run example
 ```
+
+## Project Structure
+
+```
+src/
+  ├── api/          # API related code
+  │   └── nostr/    # Nostr protocol implementation
+  ├── core/         # Core logic
+  ├── events/       # Event definitions
+  ├── storage/      # Storage implementation
+  └── utils/        # Utility functions
+test/               # Test files
+examples/           # Example code
+```
+
+## Important Notes
+
+- Call `initializeClock()` before using CSBPClock
+- Local storage uses LevelDB, data is stored in `.clockdb` directory
+- Keep private keys secure, do not commit them to the repository
+- Events are synchronized through Nostr relays
+- Each event requires a valid private key for signing
 
 ## Contributing
 
