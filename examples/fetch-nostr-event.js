@@ -4,16 +4,16 @@ async function fetchEventById(eventId, relayUrl) {
   const client = new NostrClient(relayUrl);
   
   try {
-    // 连接到 relay
+    // connect relay
     console.log('Connecting to relay:', relayUrl);
     await client.connect();
     console.log('Connected to relay');
 
-    // 获取指定事件
+    // get event by id
     console.log(`\nFetching event with ID: ${eventId}`);
     console.log('Query parameters:');
     const queryParams = {
-      kinds: [NOSTR_KINDS.INVITE], // 指定事件类型
+      kinds: [NOSTR_KINDS.INVITE], // specify event type
       ids: [eventId],
       limit: 1
     };
@@ -44,7 +44,7 @@ async function fetchEventById(eventId, relayUrl) {
       });
     });
 
-    // 打印事件详情
+    // print event details
     if (event) {
       console.log('\nEvent details:');
       console.log('-------------------------------------------');
@@ -81,9 +81,11 @@ async function fetchEventById(eventId, relayUrl) {
   }
 }
 
-// 获取命令行参数
+// get command line arguments
 const eventId = process.argv[2];
-const relayUrl = process.argv[3] || 'wss://relay1.nostrchat.io';
+const relayUrl = process.argv[3] || 'ws://213.136.84.124:10547/';
+
+//ws://213.136.84.124:10547/
 
 if (!eventId) {
   console.error('Please provide an event ID');

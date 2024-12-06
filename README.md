@@ -1,4 +1,4 @@
-# Clock-SoulBind-Points
+# Clock-SoulBind-Points (CSBP)
 
 A decentralized invitation system based on Verifiable Logical Clock and Nostr protocol.
 
@@ -9,6 +9,8 @@ A decentralized invitation system based on Verifiable Logical Clock and Nostr pr
 - Local event storage and synchronization
 - Multi-project and event type support
 - Reliable clock synchronization
+- Invitation tree visualization
+- Causal relationship tracking
 
 ## Installation
 
@@ -21,7 +23,7 @@ cd Clock-SoulBind-Points
 npm install
 ```
 
-## Usage
+## Examples
 
 ### Basic Usage
 
@@ -30,43 +32,79 @@ const { CSBPClock, initializeClock } = require('./src/core/clock');
 const { StorageManager } = require('./src/storage');
 const { NostrClient } = require('./src/api/nostr/client');
 const { InviteEvent } = require('./src/events/invite');
+const { generatePrivateKey } = require('./src/api/nostr/events');
 
-// Initialize
-await initializeClock();
-const storage = new StorageManager();
-const clock = new CSBPClock(storage);
-const client = new NostrClient('wss://relay.nostr.com');
+async function main() {
+  // Initialize
+  await initializeClock();
+  const storage = new StorageManager();
+  const clock = new CSBPClock(storage);
+  const client = new NostrClient('wss://relay.nostr.com');
+  
+  // Generate keys
+  const privateKey = generatePrivateKey();
+  
+  // Create invite event
+  const invite = new InviteEvent('event1', 'alice', 'bob', {
+    projectId: 'project123',
+    message: 'Join our project!',
+    privateKey,
+    clock // Pass clock instance to track causal relationships
+  });
 
-// Create an invite event
-const invite = new InviteEvent('event1', 'alice', 'bob', {
-  ProjectId: 'project123',
-  message: 'Join our project!',
-  privateKey: 'your_private_key'
-});
+  // Publish event and update clock
+  const clockValue = await clock.addEventAfterNostrPublish(
+    invite,
+    client,
+    'pubkey123',
+    'project123',
+    'INVITE'
+  );
 
-// Publish event and update clock
-const clockValue = await clock.addEventAfterNostrPublish(
-  invite,
-  client,
-  'pubkey123',
-  'project123',
-  'INVITE'
-);
-
-// Query events
-const events = await clock.getAllEvents('pubkey123', 'project123', 'INVITE');
+  // Query events
+  const events = await clock.getAllEvents('pubkey123', 'project123', 'INVITE');
+}
 ```
 
-### Event Types
+### Fetch Nostr Event
 
-Currently supported event types:
-- INVITE: Invitation events
+```javascript
+const { NostrClient } = require('./src/api/nostr/client');
+
+// Fetch specific event by ID
+const client = new NostrClient('wss://relay.nostr.com');
+await client.connect();
+
+client.subscribe([{
+  kinds: [1111], // INVITE event kind
+  ids: ['event_id']
+}], (event) => {
+  console.log('Received event:', event);
+});
+```
+
+### Query Invitation Status
+
+```javascript
+const { APIClient } = require('./src/api/client');
+
+const client = new APIClient();
+const address = '0x123...';
+const projectId = 'project123';
+
+// Get direct invites
+const directInvites = await client.getDirectInvites(address, projectId);
+
+// Get indirect invites
+const indirectInvites = await client.getIndirectInvites(address, projectId);
+
+// Get invitation tree
+const tree = await client.getInviteTree(address, projectId);
+```
 
 ## API Reference
 
 ### CSBPClock
-
-Main clock synchronization class.
 
 ```javascript
 class CSBPClock {
@@ -79,22 +117,7 @@ class CSBPClock {
 }
 ```
 
-### StorageManager
-
-Local storage manager.
-
-```javascript
-class StorageManager {
-  async storeEvent(event, clockValue, pubkey, projectId, eventType)
-  async getEvent(eventId, pubkey, projectId, eventType)
-  async getAllEvents(pubkey, projectId, eventType)
-  async getLatestClockValue(pubkey, projectId, eventType)
-}
-```
-
 ### InviteEvent
-
-Invitation event class.
 
 ```javascript
 class InviteEvent {
@@ -104,26 +127,22 @@ class InviteEvent {
 }
 ```
 
-### NostrClient
-
-Nostr protocol client implementation.
+### APIClient
 
 ```javascript
-class NostrClient {
-  constructor(relayUrl)
-  async connect()
-  async publish(event)
-  subscribe(filters, onEvent, onEose)
-  close()
+class APIClient {
+  async getDirectInvites(address, projectId)
+  async getIndirectInvites(address, projectId)
+  async getTotalInvites(address, projectId)
+  async getIncentives(address, projectId)
+  async getInviteTree(address, projectId)
+  async getInvitePath(fromAddress, toAddress, projectId)
 }
 ```
 
 ## Development
 
 ```bash
-# Install dependencies
-npm install
-
 # Run tests
 npm test
 
@@ -131,7 +150,10 @@ npm test
 npm test test/clock.test.js
 
 # Run example
-npm run example
+node examples/nostr-usage.js
+
+# Fetch specific Nostr event
+node examples/fetch-nostr-event.js <eventId> [relayUrl]
 ```
 
 ## Project Structure
@@ -154,16 +176,8 @@ examples/           # Example code
 - Local storage uses LevelDB, data is stored in `.clockdb` directory
 - Keep private keys secure, do not commit them to the repository
 - Events are synchronized through Nostr relays
-- Each event requires a valid private key for signing
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+- Each event includes a clock value for causal relationship tracking
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT

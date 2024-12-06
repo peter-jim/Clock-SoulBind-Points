@@ -1,38 +1,60 @@
-const { BaseEvent } = require('../core/event');
-const { EVENT_TYPES } = require('../api/constants');
 const { NostrInviteEvent } = require('../api/nostr/events');
+const { EVENT_TYPES } = require('../api/constants');
 
-class InviteEvent extends BaseEvent {
+class InviteEvent {
   constructor(id, inviter, invitee, metadata = {}) {
-    super(id, EVENT_TYPES.INVITE);
+    this.id = id;
+    this.type = EVENT_TYPES.INVITE;
     this.data = {
       inviter,
       invitee,
+      projectId: metadata.ProjectId || metadata.projectId,
       metadata: {
-        projectId: metadata.ProjectId,
-        message: metadata.message,
-        ...metadata
+        message: metadata.message || '',
+        timestamp: Date.now(),
+        platform: 'CSBP',
+        version: '1.0.0'
       }
     };
+    
+    // Store private key separately, not in the data object
+    this._privateKey = metadata.privateKey;
+    // Store clock instance if provided
+    this._clock = metadata.clock;
   }
 
   getProjectId() {
-    return this.data.metadata.projectId || this.data.metadata.ProjectId;
+    return this.data.projectId;
   }
 
   async toNostrEvent() {
-    return await NostrInviteEvent.create({
+    if (!this._privateKey) {
+      throw new Error('Private key is required to create Nostr event');
+    }
+
+    // Get current clock value if clock instance is available
+    let clockValue = 0;
+    if (this._clock) {
+      clockValue = this._clock.getClockValue(
+        this.data.inviter, // using inviter as pubkey
+        this.data.projectId,
+        this.type
+      );
+    }
+
+    return NostrInviteEvent.create({
+      id: this.id,
       inviter: this.data.inviter,
       invitee: this.data.invitee,
-      projectId: this.getProjectId(),
+      projectId: this.data.projectId,
       metadata: {
         message: this.data.metadata.message,
-        timestamp: Date.now(),
-        platform: 'CSBP',
-        version: '1.0.0',
-        ...this.data.metadata
+        timestamp: this.data.metadata.timestamp,
+        platform: this.data.metadata.platform,
+        version: this.data.metadata.version,
+        clock: clockValue // Add clock value to metadata
       },
-      privateKey: this.data.metadata.privateKey
+      privateKey: this._privateKey
     });
   }
 }

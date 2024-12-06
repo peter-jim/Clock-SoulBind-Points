@@ -6,7 +6,8 @@ async function main() {
   // Initialize clock and Nostr client
   await initializeClock();
   const clock = new CSBPClock();
-  const client = new NostrClient('wss://relay1.nostrchat.io');
+  const client = new NostrClient('wss://relay1.nostrchat.io');// wss://relay1.nostrchat.io
+
 
   try {
     // Connect to Nostr relay

@@ -7,9 +7,10 @@ const { NOSTR_KINDS, EVENT_TYPES } = require('../src/api/constants');
 const { validateContext } = require('../src/utils');
 
 async function main() {
-  const client = new NostrClient('wss://relay1.nostrchat.io');
+  const client = new NostrClient('ws://213.136.84.124:10547/');
   const storage = new StorageManager();
-  
+  //ws://213.136.84.124:10547/
+ //wss://relay1.nostrchat.io
   try {
     // Optional: Clear database
     if (process.argv.includes('--clear-db')) {
