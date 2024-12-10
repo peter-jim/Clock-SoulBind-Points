@@ -1,4 +1,4 @@
-// 添加全局 TextDecoder
+// add global TextDecoder
 global.TextDecoder = require('util').TextDecoder;
 global.TextEncoder = require('util').TextEncoder;
 

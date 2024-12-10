@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 class APIClient {
-  constructor(baseURL = 'https://api.csbp.example.com') {
+  constructor(baseURL = 'http://18.136.124.172:3200') {
     this.client = axios.create({
       baseURL,
       timeout: 10000,
@@ -11,105 +11,81 @@ class APIClient {
     });
   }
 
-  // Get clock value for specific event type
-  async getClockValue(eventType, address) {
-    try {
-      const response = await this.client.get(`/api/clock/${eventType}/${address}`);
-      return response.data;
-    } catch (error) {
-      console.error('Failed to get clock value:', error);
-      throw error;
-    }
-  }
-
-  // Get global clock value
-  async getGlobalClockValue(address) {
-    try {
-      const response = await this.client.get(`/api/clock/global/${address}`);
-      return response.data;
-    } catch (error) {
-      console.error('Failed to get global clock value:', error);
-      throw error;
-    }
-  }
-
-  // Get direct invites count
-  async getDirectInvites(address, projectId) {
+  // Get direct invites with pagination
+  async getDirectInvites(address, project, page = 1, pageSize = 10) {
     try {
       const response = await this.client.get(`/api/invite/direct/${address}`, {
-        params: { projectId }
+        params: { 
+          project,
+          page,
+          page_size: pageSize
+        }
       });
-      return response.data;
+      return response.data.result;
     } catch (error) {
       console.error('Failed to get direct invites:', error);
       throw error;
     }
   }
 
-  // Get indirect invites count
-  async getIndirectInvites(address, projectId) {
-    try {
-      const response = await this.client.get(`/api/invite/indirect/${address}`, {
-        params: { projectId }
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Failed to get indirect invites:', error);
-      throw error;
-    }
-  }
-
-  // Get total invites count
-  async getTotalInvites(address, projectId) {
+  // Get total invites
+  async getTotalInvites(address, project) {
     try {
       const response = await this.client.get(`/api/invite/total/${address}`, {
-        params: { projectId }
+        params: { project }
       });
-      return response.data;
+      // 直接返回数字结果
+      return response.data.result;
     } catch (error) {
       console.error('Failed to get total invites:', error);
       throw error;
     }
   }
 
-  // Get incentives information
+  // Get incentives count
   async getIncentives(address, projectId) {
     try {
-      const response = await this.client.post(`/api/incentives/${address}`, null, {
+      const response = await this.client.get(`/api/incentives/${address}`, {
         params: { projectId }
       });
-      return response.data;
+      return response.data.result;
     } catch (error) {
       console.error('Failed to get incentives:', error);
       throw error;
     }
   }
 
-  // Get invitation tree for visualization
-  async getInviteTree(address, projectId) {
+  // Helper method to calculate indirect invites
+  async getIndirectInvites(address, project, page = 1, pageSize = 10) {
     try {
-      const response = await this.client.get(`/api/invite/tree/${address}`, {
-        params: { projectId }
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Failed to get invite tree:', error);
-      throw error;
-    }
-  }
+      const [totalInvites, directInvites] = await Promise.all([
+        this.getTotalInvites(address, project),
+        this.getDirectInvites(address, project, page, pageSize)
+      ]);
 
-  // Get invitation path between two addresses
-  async getInvitePath(fromAddress, toAddress, projectId) {
-    try {
-      const response = await this.client.get(`/api/invite/path/${fromAddress}/${toAddress}`, {
-        params: { projectId }
-      });
-      return response.data;
+      // Calculate indirect invites
+      const directCount = directInvites.items[0]?.count || 0;
+      const indirectCount = totalInvites - directCount;
+
+      return {
+        items: [{
+          id: directInvites.items[0]?.id,
+          from: address,
+          count: indirectCount,
+          project: project,
+          info: {},
+          created_at: new Date().toISOString()
+        }],
+        total_items: 1,
+        page,
+        page_size: pageSize,
+        num_pages: 1
+      };
     } catch (error) {
-      console.error('Failed to get invite path:', error);
+      console.error('Failed to calculate indirect invites:', error);
       throw error;
     }
   }
 }
 
-module.exports = { APIClient }; 
+module.exports = { APIClient };
