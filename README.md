@@ -1,6 +1,6 @@
-# Clock-SoulBind-Points (CSBP)
+# causality-client-js
 
-A decentralized invitation system based on Verifiable Logical Clock and Nostr protocol.
+JavaScript client library for Causality Protocol - A decentralized invitation system based on Verifiable Logical Clock and Nostr protocol.
 
 ## Features
 
@@ -15,12 +15,29 @@ A decentralized invitation system based on Verifiable Logical Clock and Nostr pr
 ## Installation
 
 ```bash
-# Clone the repository
-git clone https://github.com/peter-jim/Clock-SoulBind-Points
+npm install causality-client-js
+```
 
-# Install dependencies
-cd Clock-SoulBind-Points
-npm install
+## Usage
+
+```javascript
+const { APIClient } = require('causality-client-js');
+
+const client = new APIClient({
+  baseURL: 'http://18.136.124.172:3200'
+});
+
+// Get direct invites
+const directInvites = await client.getDirectInvites(address, projectId);
+
+// Get indirect invites
+const indirectInvites = await client.getIndirectInvites(address, projectId);
+
+// Get total invites
+const totalInvites = await client.getTotalInvites(address, projectId);
+
+// Get incentives
+const incentives = await client.getIncentives(address, projectId);
 ```
 
 ## Examples

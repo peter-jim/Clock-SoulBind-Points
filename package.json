@@ -1,7 +1,7 @@
 {
-  "name": "csbp",
+  "name": "causality-client-js",
   "version": "1.0.0",
-  "description": "Clock SoulBind Point (CSBP) implementation based on Verifiable Logical Clock",
+  "description": "JavaScript client for Causality Protocol - A decentralized invitation system based on Verifiable Logical Clock",
   "main": "dist/index.js",
   "scripts": {
     "test": "jest",

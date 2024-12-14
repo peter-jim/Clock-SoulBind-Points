@@ -1,12 +1,13 @@
 const axios = require('axios');
 
-class APIClient {
-  constructor(baseURL = 'http://18.136.124.172:3200') {
+class CausalityClient {
+  constructor(config = {}) {
     this.client = axios.create({
-      baseURL,
-      timeout: 10000,
+      baseURL: config.baseURL || 'http://18.136.124.172:3200',
+      timeout: config.timeout || 10000,
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        ...config.headers
       }
     });
   }
@@ -88,4 +89,4 @@ class APIClient {
   }
 }
 
-module.exports = { APIClient };
+module.exports = { CausalityClient };

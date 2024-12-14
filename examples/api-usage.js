@@ -1,7 +1,7 @@
-const { APIClient } = require('../src/api/client');
+const { CausalityClient } = require('../src/api/client');
 
 async function main() {
-  const client = new APIClient();
+  const client = new CausalityClient();
   const address = 'a77f1799de0148c07bc6ef630fb75ac267f31d147cd28797ad145afe72302632';
   const project = 'haike0513@gmail.com';
 
